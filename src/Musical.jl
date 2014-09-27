@@ -13,8 +13,6 @@ export TIME_TYPE, AMP_TYPE, totimetype, toamptype,
     sinewave, squarewave, sawtooth, trianglewave, whitenoise, binarynoise, WaveForm, waveform,
     plotall
 using WAV, DSP, PyPlot
-require("Options")
-using OptionsMod
 
 
 typealias TIME_TYPE Float64
