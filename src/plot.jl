@@ -38,10 +38,10 @@ function logbinavg(p::AbstractArray, f::AbstractArray, bins::Integer)
     return x, fls
 end
 
-function plotall(s::MCSound; pgwin=tukey(samples(s),0.0003), pgnfft=nextfastfft(samples(s)), pgbins::Integer=600)
+function plotall(s::MCAudio; pgwin=tukey(nsamples(s),0.0003), pgnfft=nextfastfft(nsamples(s)), pgbins::Integer=600)
 
-    fs = s.rate
-    n = samples(s)
+    fs = s.fs
+    n = nsamples(s)
     x = s[:left]
 
     wl = 256*2
