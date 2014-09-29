@@ -16,7 +16,7 @@ See license (MIT) in LICENSE.md.
 s = importsound("sounds.wav")
 s.v     # the array of values
 s.fs    # the sample-rate
-# extact left channels of stereo audio
+# extract the left channel of stereo audio
 lc = s[:left]
 # divide the first 100ms by 2
 s[:sec, 0, 0.1] /= 2
@@ -31,5 +31,15 @@ plotall(w)
 # export
 exportsound(w,"waveform.wav")
 ```
+
+Example of creation of notes in standard tuning
+```julia
+wf = WaveForm(env=ENVELOPE_STANDARD)
+fs = 44100
+w = waveform(notefreq("E4"), 5, fs, wf)+0.5*waveform(notefreq("E5"), 5, fs, wf)+0.3*waveform(notefreq("E6"), 5, fs, wf)
+w = w/2
+exportsound(w, "E4.wav")
+```
+
 
 

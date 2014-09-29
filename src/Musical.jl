@@ -1,17 +1,20 @@
 module Musical
 export TIME_TYPE, AMP_TYPE, totimetype, toamptype,
-    MCAudio, 
+    MCAudio, addto!, appendzeros!,
     nchannels, nsamples, 
     ismono, isstereo,
     left, right, 
     centerrange, leftrange, rightrange,
-    seconds2saferange,
+    seconds2saferange, unsafe_seconds2range,
     mono, stereo, 
     db, dB,
     importsound, exportsound,
+    plotall,
     Envelope, ADSREnvelope, ENVELOPE_BOX, ENVELOPE_STANDARD, apply!, 
-    sinewave, squarewave, sawtooth, trianglewave, whitenoise, binarynoise, WaveForm, waveform,
-    plotall
+    sinewave, squarewave, sawtooth, trianglewave, whitenoise, binarynoise, chirpf, ichirpf,
+    WaveForm, waveform,
+    Note, Notes, Tuning, TUNING_STANDARD, notefreq
+    
 using WAV, DSP, PyPlot
 
 
@@ -130,6 +133,7 @@ nchannels(s::MCAudio) = nchannels(s.v)
 nchannels(v::AbstractArray) = size(v, 2)
 nsamples(s::MCAudio) = nsamples(s.v)
 nsamples(v::AbstractArray) = size(v, 1)
+timelength(s::MCAudio) = totimetype(nsamples(s)/s.fs)
 # mono
 centerrange(s::MCAudio) = 1:nsamples(s)
 ismono(s::MCAudio) = (nchannels(s) == 1)
@@ -144,6 +148,12 @@ function seconds2saferange(fs::Integer, nsamples::Integer, a::Real, b::Real)
     i1 = max(1, i1)
     i2 = int(totimetype(b)*fs)
     i2 = min(nsamples, i2)
+    return i1:i2
+end
+unsafe_seconds2range(s::MCAudio, a::Real, b::Real) = unsafe_seconds2range(s.fs,nsamples(s),a,b)
+function unsafe_seconds2range(fs::Integer, nsamples::Integer, a::Real, b::Real)
+    i1 = int(totimetype(a)*fs) + 1
+    i2 = int(totimetype(b)*fs)
     return i1:i2
 end
 
@@ -195,11 +205,48 @@ end
 /(s::MCAudio, d::MCAudio) = MCAudio(s.v ./ d.v, s.fs)
 (^)(s::MCAudio, d::MCAudio) = MCAudio(s.v .^ d.v, s.fs)
 
+
+function addto!(s::MCAudio, time::Real, a::MCAudio)
+    @assert nchannels(s) == nchannels(a)
+
+    starti = unsafe_seconds2range(s, time, time).start
+    ir = starti:(starti + nsamples(a) - 1)
+    if ir[end] > nsamples(s)  #append s with zeros
+        appendzeros!(s, ir[end])
+    end
+    addarrays!(s.v, ir, a.v)
+    return s
+end
+function appendzeros!(s::MCAudio, n::Integer)
+    @assert n > nsamples(s)
+    sv = s.v
+    s.v = zeros(AMP_TYPE, n, nchannels(s))
+    for j in 1:nchannels(s)
+        copy!(s.v, 1 + (j-1)*nsamples(s.v), sv, 1 + (j-1)*nsamples(sv), nsamples(sv))
+    end
+    return s
+end
+function addarrays!(a::Array, ir::Range, b::Array)
+    @assert nchannels(a) == nchannels(b)
+    @assert length(ir) == nsamples(b)
+    @assert ir[end] <= nsamples(a)
+    @inbounds for c in 1:nchannels(a)
+        for i = 1:length(ir)
+            a[ir[i],c] += b[i,c]
+        end
+    end
+    return a
+end
+
+
+
+
 type dBconvert
 end
 const dB = dBconvert()
 *(a::Real, d::dBconvert) = db(a)
 db(a::Real) = toamptype(10^(a*0.05))
+
 
 function importsound(file::String; subrange=Any)
     x = wavread(file; subrange=subrange, format="double")
@@ -269,7 +316,9 @@ sawtooth(x) = 2*(x + halft - floor(x + halft)) - 1
 trianglewave(x) = twodpi*asin(sin(twopi*x))
 whitenoise(x) = 2*rand(AMP_TYPE) - 1
 binarynoise(x) = 2*round(rand(AMP_TYPE)) - 1
-
+chirpf(x, k::Real=1, f0::Real = 0) = x.*(f0 + k*x)
+ichirpf(x) = chirpf(x, -1, 20000)
+expchirpf(x, k::Real=2, f0::Real = 1) = x.*(1f-2.*k.^(x))
 
 
 type WaveForm
@@ -321,5 +370,89 @@ function setwave!(w, ww, r, wave, fp)
     return w
 end
 
+type Note
+	freq::Real
+	start::TIME_TYPE	# starting time
+	S::TIME_TYPE		# sustain time
+	amp::AMP_TYPE		# amplitude multiplier
+	Note(freq, start, S, amp=1) = new(freq, start, S, amp)
 end
+
+type Notes
+	notes::Vector{Note}
+	wf::WaveForm
+	fs::Int
+    Notes(notes, wf, fs) = new(notes, wf, fs)
+end
+
+immutable Tuning
+    value2freq::Function    # convert frequency value to Hz (Real -> TIME_TYPE)
+    note2value::Function    # convert note name to frequency value (ASCIIString -> Real)
+    Tuning(value2freq, note2value) = new(value2freq, note2value)
+end
+
+function midinotenumber2freq(d::Real)
+    return totimetype( 2^((d-69)/12)*440 )
+end
+function standardnote2value(n::ASCIIString)
+    v = 60
+    baseoct = 4
+    note, oct = noteoct(n, baseoct)
+    v = v + (oct - baseoct)*12
+    if note == "C"
+        # v += 0
+    elseif note == "C#" || note == "Db"
+        v += 1 
+    elseif note == "D"
+        v += 2
+    elseif note == "D#" || note == "Eb"
+        v += 3
+    elseif note == "E"
+        v += 4
+    elseif note == "F"
+        v += 5
+    elseif note == "F#" || note == "Gb"
+        v += 6
+    elseif note == "G"
+        v += 7
+    elseif note == "G#" || note == "Ab"
+        v += 8
+    elseif note == "A"
+        v += 9
+    elseif note == "A#" || note == "Bb"
+        v += 10
+    elseif note == "B"
+        v += 11
+    else
+        error("uknown note ", string(note))
+    end
+    return v
+end
+function noteoct(n::ASCIIString, baseoct::Integer)
+    ind = 0
+    for i in 1:length(n)
+        if isdigit(n[i])
+            ind = i
+            break
+        end
+    end
+    if ind == 0
+        oct = baseoct
+    elseif ind == 1
+        error("no note supplied: ", string(n))
+    else
+        oct = int(n[ind:end])
+    end
+    note = n[1:ind-1]
+    return note, oct
+end
+
+const TUNING_STANDARD = Tuning(midinotenumber2freq, standardnote2value)
+
+notefreq(x::ASCIIString, t::Tuning=TUNING_STANDARD) = notefreq(t.note2value(x), t)
+notefreq(x::Real, t::Tuning=TUNING_STANDARD) = t.value2freq(x)
+
+
+
+end #module
 

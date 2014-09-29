@@ -14,6 +14,7 @@ function logimage(A,x)
     return B
 end
 
+# bins of averages on log scale
 function logbinavg(p::AbstractArray, f::AbstractArray, bins::Integer)
     @assert length(p) == length(f)
     n = length(p)
@@ -88,8 +89,10 @@ function plotall(s::MCAudio; pgwin=tukey(nsamples(s),0.0003), pgnfft=nextfastfft
     ax[3][:set_ylim]([-100,2])
     #ax[3][:set_xlabel]("Hz")
     ax[3][:set_ylabel]("dB")
-
+    ax[3][:grid](b=true, axis="x", which="minor")
+    ax[3][:grid](b=true, axis="y")
     #f[:set_size_inches](10,7)
     draw()
+    return f, ax
 
 end
