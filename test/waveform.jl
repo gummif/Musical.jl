@@ -18,13 +18,12 @@ exportsound(w,"test44b.wav")
 #w = importsound("asmz.wav")
 
 
-run(`vlc test44b.wav`)
-#plotall(stereo(w))
-plotall(addto!(w, 0, (-6dB)*waveform(2000, 1, 44100, WaveForm(nchannels=2))))
+#run(`vlc test44b.wav`)
+plotall(stereo(w))
+#plotall(addto!(w, 0, (-6dB)*waveform(2000, 1, 44100, WaveForm(nchannels=2))))
 
 #f, ax = plotall(stereo(w))
 #ax[3][:grid](axis="y", which="major")
-
 
 
 wf = WaveForm(env=ENVELOPE_STANDARD)

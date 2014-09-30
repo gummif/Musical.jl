@@ -47,8 +47,8 @@ function plotall(s::MCAudio; pgwin=tukey(nsamples(s),0.0003), pgnfft=nextfastfft
 
     wl = 256*2
     wl > n && (wl=n>>2)
-    gain = 2
-    dbr = 70
+    gain = 10
+    dbr = 80
 
     # audio
     sv = x
